@@ -36,12 +36,13 @@ app.post('/api/devices/update', async (req, res) => {
   try {
     const deviceKey = req.headers['x-device-key'] || req.query.device_key;
     if (!deviceKey) return res.status(401).json({ error: 'Missing device key' });
+
     const device = await validateDeviceKey(knex, deviceKey);
     if (!device) return res.status(403).json({ error: 'Invalid device key' });
 
     const payload = req.body;
-    // expected: { id, lat, lon, speed, heading, ts }
     payload.device_id = device.id; // internal mapping
+
     const saved = await upsertPosition(knex, payload);
 
     // broadcast to websocket clients
@@ -68,22 +69,27 @@ app.get('/api/history/:id', async (req, res) => {
   res.json(rows);
 });
 
-// Geofence endpoints (simple)
+// Geofence endpoints
 app.post('/api/geofences', async (req, res) => {
-  const { name, polygon } = req.body; // polygon: array of [lon,lat]
-  const inserted = await knex('geofences').insert({ name, polygon: JSON.stringify(polygon) }).returning('*');
+  const { name, polygon } = req.body;
+  const inserted = await knex('geofences')
+    .insert({ name, polygon: JSON.stringify(polygon) })
+    .returning('*');
   res.json(inserted[0]);
 });
 
 app.get('/api/geofences', async (req, res) => {
   const rows = await knex('geofences').select('*');
-  res.json(rows.map(r => ({ id: r.id, name: r.name, polygon: JSON.parse(r.polygon) })));
+  res.json(rows.map(r => ({
+    id: r.id,
+    name: r.name,
+    polygon: JSON.parse(r.polygon)
+  })));
 });
 
-// Serve static frontend build (if deployed together)
-const path = require('path');
-app.use(express.static(path.join(__dirname, '../../frontend/dist')));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, '../../frontend/dist/index.html')));
+// ❌ REMOVED WRONG FRONTEND SERVING CODE
+// app.use(express.static(path.join(__dirname, '../../frontend/dist')));
+// app.get('*', (req, res) => res.sendFile(path.join(__dirname, '../../frontend/dist/index.html')));
 
 // WebSocket handling: send initial snapshot
 wss.on('connection', async ws => {
