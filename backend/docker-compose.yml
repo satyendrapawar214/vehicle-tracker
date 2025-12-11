@@ -1,0 +1,56 @@
+version: '3.8'
+services:
+  app:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env.example
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - DEVICE_DEFAULT_API_KEY=${DEVICE_DEFAULT_API_KEY}
+    depends_on:
+      - db
+    networks:
+      - webnet
+
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: vehicledb
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - webnet
+
+  nginx:
+    image: nginx:stable
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certbot/www:/var/www/certbot
+      - ./nginx/certs:/etc/letsencrypt
+    depends_on:
+      - app
+    networks:
+      - webnet
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./nginx/certbot/www:/var/www/certbot
+      - ./nginx/certs:/etc/letsencrypt
+    entrypoint: ""
+    networks:
+      - webnet
+
+volumes:
+  db-data:
+
+networks:
+  webnet:
+    driver: bridge
