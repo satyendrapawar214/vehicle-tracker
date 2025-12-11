@@ -1,11 +1,27 @@
+FROM node:18-alpine AS builder
+
+# 1) Build frontend
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ .
+RUN npm run build
+
+# 2) Build backend
 FROM node:18-alpine
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-COPY package.json ./
+# Copy backend source
+COPY backend/package*.json ./
+RUN npm install
 
-RUN npm install --production
+COPY backend/ .
 
-COPY . .
+# Copy frontend build to backend
+COPY --from=builder /app/frontend/dist ./frontend/dist
+
+# Expose port
+EXPOSE 4000
 
 CMD ["node", "src/index.js"]
